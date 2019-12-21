@@ -1,0 +1,107 @@
+---
+title: "BRM Analysis"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+Read in raw data, cleaning
+
+```{r}
+pupil_measures <- readxl::read_excel("../data/Engagement_Data.xlsx",
+                                 sheet = "Event_Statistics") %>%
+  filter(Category == "Fixation") %>% 
+  select(Trial, video, Export.End.Trial.Time..ms., Participant, Tracking.Ratio...., Category, Eye.L.R, Event.Start.Trial.Time..ms., Event.End.Trial.Time..ms., Event.Duration..ms., Fixation.Average.Pupil.Diameter..mm., type) %>%
+  rename(trial = Trial,
+         length_trial = Export.End.Trial.Time..ms.,
+         participant = Participant,
+         track_ratio = Tracking.Ratio....,
+         eye = Eye.L.R,
+         measure_start = Event.Start.Trial.Time..ms.,
+         measure_end = Event.End.Trial.Time..ms.,
+         duration = Event.Duration..ms.,
+         pupil_mm = Fixation.Average.Pupil.Diameter..mm.) %>% 
+  filter(length_trial > 500000) 
+```
+
+Reading in baseline data
+
+```{r}
+baseline <- read_csv("../data/baseline_data.csv")
+```
+
+Plotting raw pupil measurements over time
+
+```{r}
+pupil_measures %>% 
+  ggplot(aes(x=measure_start, y = pupil_mm)) +
+  geom_point(aes(col = participant))
+```
+
+Change from baseline
+
+```{r}
+pupil_measures %>% 
+  select(participant, measure_start, pupil_mm) %>% 
+  left_join(baseline %>% 
+              select(participant, pupil_dia_mm_mean), by = c("participant")) %>% 
+  mutate(pupil_change = pupil_mm - pupil_dia_mm_mean) %>% 
+  ggplot(aes(x=measure_start, y = pupil_change)) +
+  geom_point(aes(col = participant))
+```
+
+Clean pupil data based on:https://link.springer.com/article/10.3758/s13428-018-1075-y
+
+Remove values outside of feasible range: 1.5-9 mm
+
+
+```{r}
+pupil_measures <- pupil_measures %>% 
+  filter(!(pupil_mm < 1.5 | pupil_mm > 9))
+```
+
+Filtering outliers based on dilation speed
+
+1) Estimate dilation speed
+
+```{r}
+pupil_measures <- pupil_measures %>% 
+  arrange(participant, eye, measure_start) %>%
+  group_by(participant, eye) %>% 
+   mutate(d_lag = abs((pupil_mm - lag(pupil_mm)) / (measure_start - lag(measure_start))),
+         d_lead = abs((pupil_mm - lead(pupil_mm)) / (measure_start - lead(measure_start)))) %>% 
+  mutate(d_speed = pmax(d_lag, d_lead, na.rm = TRUE)) %>% 
+  select(-c(d_lag, d_lead)) %>% 
+  ungroup()
+```
+
+2) Assessing distribution of deviations from median
+
+```{r}
+pupil_measures %>% 
+  mutate(d_deviation = abs(d_speed - median(d_speed, na.rm = TRUE))) %>% 
+  ggplot() +
+  geom_histogram(aes(x = d_deviation))
+```
+
+3) Estimating mean absolute deviation across participants
+
+```{r}
+pupil_measures %>% 
+  mutate(d_deviation = abs(d_speed - median(d_speed, na.rm = TRUE))) %>% 
+  summarise(MAD = median(d_deviation, na.rm = TRUE),
+            threshold = median(d_speed, na.rm = TRUE) + 10*MAD)
+```
+
+4) Filtering observtions above threshold
+
+```{r}
+pupil_measures <- pupil_measures %>% 
+  filter(!(d_speed > 0.002303483))
+```
+
+
+Functional Mixed Effections modeling
