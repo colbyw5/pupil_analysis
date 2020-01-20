@@ -1,4 +1,4 @@
-### Analysis of Pupil Diameter Profile Among Navy Sailors Undergoing Training Exercises via Functional Data Analysis
+### Pupil Diameter Profile Estimation Among Navy Sailors Undergoing Training Exercises via Functional Data Analysis
 
 **Background**: A growing body of literature in Cognitive Psychology uses subject pupil diameter to track task engagement over time.  The data and code in this repository was used as part of a Master's Thesis practicum utilizing Functional Data Analysis to assess Pupil Diameter profile in subjects undergoing a training exercise.  Tracking engagement over time informs educators on the aspects of training material that increase/decrease subject engagement, which has been associated with subject performance.
 
