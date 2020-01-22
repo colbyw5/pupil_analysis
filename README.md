@@ -2,6 +2,8 @@
 
 **Background**: A growing body of literature in Cognitive Psychology uses subject pupil diameter to track task engagement over time.  The data and code in this repository was used as part of a Master's Thesis practicum utilizing Functional Data Analysis to assess Pupil Diameter profile in subjects undergoing a training exercise.  Tracking engagement over time informs educators on the aspects of training material that increase/decrease subject engagement, which has been associated with subject performance.
 
+Language: R Version 3.5.3
+
 **Data**: Pupil Diameter was collected as Navy Sailors (n = 21) underwent a distance learning training exercise. Sailors were assigned one of three videos, which lasted roughly 9 minutes each.  Pupil diameter profiles was estiamted vis Functional Mixed Effects (FMM) modelling, a Functional Data Analysis technique used to estiamte individual trajectories while utilizing information from other subjects' data
 
 **Methods**:  Data cleaning followed the process established in this 2019 research paper: https://link.springer.com/article/10.3758/s13428-018-1075-y. Once outliers were removed an missing values imputed where appropriate, mean pupil diameter was re-sampled in 2 second bins.
