@@ -4,6 +4,12 @@
 
 Language: R Version 3.5.3
 
+Key Packages:
+
+- dplyr==0.8.3
+- ggplot==3.2.1
+- lme4==1.1-21
+
 **Data**: Pupil Diameter was collected as Navy Sailors (n = 21) underwent a distance learning training exercise. Sailors were assigned one of three videos, which lasted roughly 9 minutes each.  Pupil diameter profiles was estiamted vis Functional Mixed Effects (FMM) modelling, a Functional Data Analysis technique used to estiamte individual trajectories while utilizing information from other subjects' data
 
 **Methods**:  Data cleaning followed the process established in this 2019 research paper: https://link.springer.com/article/10.3758/s13428-018-1075-y. Once outliers were removed an missing values imputed where appropriate, mean pupil diameter was re-sampled in 2 second bins.
