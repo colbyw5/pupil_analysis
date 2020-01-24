@@ -11,20 +11,10 @@ library(tidyverse)
 Read in raw data, cleaning
 
 ```{r}
-pupil_measures <- readxl::read_excel("../data/Engagement_Data.xlsx",
-                                 sheet = "Event_Statistics") %>%
-  filter(Category == "Fixation") %>% 
-  select(Trial, video, Export.End.Trial.Time..ms., Participant, Tracking.Ratio...., Category, Eye.L.R, Event.Start.Trial.Time..ms., Event.End.Trial.Time..ms., Event.Duration..ms., Fixation.Average.Pupil.Diameter..mm., type) %>%
-  rename(trial = Trial,
-         length_trial = Export.End.Trial.Time..ms.,
-         participant = Participant,
-         track_ratio = Tracking.Ratio....,
-         eye = Eye.L.R,
-         measure_start = Event.Start.Trial.Time..ms.,
-         measure_end = Event.End.Trial.Time..ms.,
-         duration = Event.Duration..ms.,
-         pupil_mm = Fixation.Average.Pupil.Diameter..mm.) %>% 
-  filter(length_trial > 500000) 
+pupil_measures <- read_csv("../data/pupil_data.csv") %>%
+  filter(event == "Fixation") %>%
+  filter(trial_length_ms > 500000) %>% 
+  mutate(pupil_diameter = as.numeric(pupil_diameter))
 ```
 
 Reading in baseline data
@@ -37,19 +27,25 @@ Plotting raw pupil measurements over time
 
 ```{r}
 pupil_measures %>% 
-  ggplot(aes(x=measure_start, y = pupil_mm)) +
+  ggplot(aes(x=event_start_ms, y = pupil_diameter)) +
   geom_point(aes(col = participant))
+```
+
+```{r}
+pupil_measures %>% 
+  ggplot(aes(x=event_start_ms, y = pupil_diameter)) +
+  geom_line(aes(col = participant))
 ```
 
 Change from baseline
 
 ```{r}
 pupil_measures %>% 
-  select(participant, measure_start, pupil_mm) %>% 
+  select(participant, event_start_ms, pupil_diameter) %>% 
   left_join(baseline %>% 
               select(participant, pupil_dia_mm_mean), by = c("participant")) %>% 
-  mutate(pupil_change = pupil_mm - pupil_dia_mm_mean) %>% 
-  ggplot(aes(x=measure_start, y = pupil_change)) +
+  mutate(pupil_change = pupil_diameter - pupil_dia_mm_mean) %>% 
+  ggplot(aes(x=event_start_ms, y = pupil_change)) +
   geom_point(aes(col = participant))
 ```
 
@@ -60,7 +56,7 @@ Remove values outside of feasible range: 1.5-9 mm
 
 ```{r}
 pupil_measures <- pupil_measures %>% 
-  filter(!(pupil_mm < 1.5 | pupil_mm > 9))
+  filter(!(pupil_diameter < 1.5 | pupil_diameter > 9))
 ```
 
 Filtering outliers based on dilation speed
@@ -69,10 +65,10 @@ Filtering outliers based on dilation speed
 
 ```{r}
 pupil_measures <- pupil_measures %>% 
-  arrange(participant, eye, measure_start) %>%
+  arrange(participant, eye, event_start_ms) %>%
   group_by(participant, eye) %>% 
-   mutate(d_lag = abs((pupil_mm - lag(pupil_mm)) / (measure_start - lag(measure_start))),
-         d_lead = abs((pupil_mm - lead(pupil_mm)) / (measure_start - lead(measure_start)))) %>% 
+   mutate(d_lag = abs((pupil_diameter - lag(pupil_diameter)) / (event_start_ms - lag(event_start_ms))),
+         d_lead = abs((pupil_diameter - lead(pupil_diameter)) / (event_start_ms - lead(event_start_ms)))) %>% 
   mutate(d_speed = pmax(d_lag, d_lead, na.rm = TRUE)) %>% 
   select(-c(d_lag, d_lead)) %>% 
   ungroup()
@@ -104,4 +100,115 @@ pupil_measures <- pupil_measures %>%
 ```
 
 
-Functional Mixed Effections modeling
+Functional Mixed Effections Modelling
+
+```{r}
+library(lme4)
+library(nlme)
+library(splines)
+library(lmerTest)
+library(MuMIn)
+```
+
+Test model and figure
+
+Resample 5 second intervals
+
+```{r}
+test_measures <- pupil_measures %>% 
+  mutate(sec_5 = event_start_ms %/% 5000) %>% 
+  group_by(participant, sec_5) %>% 
+  summarise(pupil_diameter = mean(pupil_diameter, na.rm = TRUE))
+```
+
+
+```{r}
+test_model <- lmer(data = test_measures,
+                       pupil_diameter ~ bs(sec_5, df = 3, degree = 2) + (bs(sec_5, df = 3, degree = 2) | participant))
+```
+
+```{r}
+test_measures %>%
+  ggplot(aes(x = sec_5, y = pupil_diameter)) +
+  geom_point(size = 1, col = "darkgrey") +
+  geom_line(aes(y = predict(test_model), group = participant, col = "Subject"), size = 0.5) +
+  geom_line(data = test_measures %>% distinct(sec_5), aes(y = predict(test_model, re.form = NA, newdata = test_measures %>% distinct(sec_5)), col="Population"), size = 1.5) +
+  scale_colour_manual(values = c("Subject" = "darkgrey", "Population" = "red")) +
+  xlab("5-second interval") +
+  ylab("Pupil Size (mm)") +
+  #scale_x_continuous(labels = c("0:00", "1:00", "2:00", "3:00", "4:00", "5:00", "6:00", "7:00", "8:00", "9:00"), breaks = c(0, seq(3,27,3))) +
+  scale_y_continuous(breaks = seq(0,5,0.5), limits = c(1.5,5.5)) +
+  theme(legend.title = element_blank()) + 
+    theme(axis.text = element_text(size = 6)) + 
+    theme(axis.title = element_text(size = 8)) +
+    theme(legend.direction = "horizontal") +
+    theme(legend.position = "bottom") +
+    theme(legend.margin = margin(t = 0, b = 0, unit='cm')) +
+    theme(axis.title = element_text(size = 10)) +
+    theme(axis.text = element_text(size = 8))
+```
+
+
+### AIC as number of knots is increased
+
+Considering 1 to 9 knots placed at quantiles of time intervals.
+
+```{r, warning=FALSE, message=FALSE}
+
+AIC_s <- rep(0,9)
+BIC_s <- rep(0,9)
+
+for (i in 2:10){
+  
+  PS_model <- lmer(data = fixation_intervals,
+                       pupil_mean ~ bs(event_interval, df = i, degree = 1) + (bs(event_interval, df = i, degree = 1) | ID))
+
+  AIC_s[i-1] <- AICc(PS_model)
+  BIC_s[i-1] <- BIC(PS_model)
+}
+
+ggplot(data = data_frame(knots = 1:9, AIC = AIC_s, BIC = BIC_s)) +
+  geom_point(aes(x = knots, y = AIC, col = "red")) +
+  geom_point(aes(x = knots, y = BIC, col = "blue")) +
+  ylab("BIC/AIC") +
+  xlab("Number of b-spline internal knots") +
+  scale_color_manual(labels = c("BIC", "AIC"), values = c("blue", "red")) +
+  theme(legend.title = element_blank())
+
+AIC_s
+```
+
+AIC suggests 2 knots for piecewise linear
+
+### Altering degree of b-spline polynomial
+
+Considering polynomials of degree 1 to 5
+
+```{r, warning=FALSE, message=FALSE}
+AIC_s <- rep(0,5)
+BIC_s <- rep(0,5)
+
+for (i in 1:5){
+  
+  PS_model <- lmer(data = fixation_intervals,
+                       pupil_mean ~ bs(event_interval, degree = i, df = (i+2)) + (bs(event_interval, degree = i, df = (i+2)) | ID))
+
+  AIC_s[i] <- AICc(PS_model)
+  BIC_s[i] <- BIC(PS_model)
+}
+
+ggplot(data = data_frame(degree = 1:5, AIC = AIC_s, BIC = BIC_s)) +
+  geom_point(aes(x = degree, y = AIC, col = "red")) +
+  geom_point(aes(x = degree, y = BIC, col = "blue")) +
+  ylab("BIC/AIC") +
+  xlab("Degree of b-spline polynomial") +
+  scale_color_manual(labels = c("BIC", "AIC"), values = c("blue", "red")) +
+  theme(legend.title = element_blank())
+
+AIC_s
+```
+
+
+
+AIC suggests a piece-wise linear model for the b-spline approximation.
+
