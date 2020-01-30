@@ -112,11 +112,11 @@ library(MuMIn)
 
 Test model and figure
 
-Resample 5 second intervals
+Resample 1 second intervals
 
 ```{r}
 test_measures <- pupil_measures %>% 
-  mutate(sec_5 = event_start_ms %/% 5000) %>% 
+  mutate(sec_5 = event_start_ms %/% 1000) %>% 
   group_by(participant, sec_5) %>% 
   summarise(pupil_diameter = mean(pupil_diameter, na.rm = TRUE))
 ```
@@ -134,7 +134,7 @@ test_measures %>%
   geom_line(aes(y = predict(test_model), group = participant, col = "Subject"), size = 0.5) +
   geom_line(data = test_measures %>% distinct(sec_5), aes(y = predict(test_model, re.form = NA, newdata = test_measures %>% distinct(sec_5)), col="Population"), size = 1.5) +
   scale_colour_manual(values = c("Subject" = "darkgrey", "Population" = "red")) +
-  xlab("5-second interval") +
+  xlab("1-second interval") +
   ylab("Pupil Size (mm)") +
   #scale_x_continuous(labels = c("0:00", "1:00", "2:00", "3:00", "4:00", "5:00", "6:00", "7:00", "8:00", "9:00"), breaks = c(0, seq(3,27,3))) +
   scale_y_continuous(breaks = seq(0,5,0.5), limits = c(1.5,5.5)) +
