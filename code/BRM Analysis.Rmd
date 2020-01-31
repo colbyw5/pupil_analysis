@@ -102,6 +102,8 @@ pupil_measures <- pupil_measures %>%
 
 Functional Mixed Effections Modelling
 
+Check for packages actually used
+
 ```{r}
 library(lme4)
 library(nlme)
@@ -110,6 +112,15 @@ library(lmerTest)
 library(MuMIn)
 ```
 
+Minimum trial length: truncating videos here
+
+```{r}
+trial_min <- pupil_measures %>% 
+  summarise(trial_min = min(trial_length_ms)) %>% 
+  .$trial_min
+```
+
+
 Test model and figure
 
 Resample 1 second intervals
@@ -117,6 +128,7 @@ Resample 1 second intervals
 ```{r}
 test_measures <- pupil_measures %>% 
   mutate(sec_5 = event_start_ms %/% 1000) %>% 
+  filter(event_start_ms < trial_min) %>% 
   group_by(participant, sec_5) %>% 
   summarise(pupil_diameter = mean(pupil_diameter, na.rm = TRUE))
 ```
