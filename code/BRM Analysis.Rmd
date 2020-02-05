@@ -120,31 +120,27 @@ trial_min <- pupil_measures %>%
   .$trial_min
 ```
 
-
-Test model and figure
-
 Resample 1 second intervals
 
 ```{r}
 test_measures <- pupil_measures %>% 
-  mutate(sec_5 = event_start_ms %/% 1000) %>% 
+  mutate(sec_1 = event_start_ms %/% 1000) %>% 
   filter(event_start_ms < trial_min) %>% 
-  group_by(participant, sec_5) %>% 
+  group_by(participant, sec_1) %>% 
   summarise(pupil_diameter = mean(pupil_diameter, na.rm = TRUE))
 ```
 
+Function to plot resulting model
 
 ```{r}
-test_model <- lmer(data = test_measures,
-                       pupil_diameter ~ bs(sec_5, df = 3, degree = 2) + (bs(sec_5, df = 3, degree = 2) | participant))
-```
 
-```{r}
-test_measures %>%
+plot_fda <- function(model){
+  
+g <- test_measures %>%
   ggplot(aes(x = sec_5, y = pupil_diameter)) +
   geom_point(size = 1, col = "darkgrey") +
-  geom_line(aes(y = predict(test_model), group = participant, col = "Subject"), size = 0.5) +
-  geom_line(data = test_measures %>% distinct(sec_5), aes(y = predict(test_model, re.form = NA, newdata = test_measures %>% distinct(sec_5)), col="Population"), size = 1.5) +
+  geom_line(aes(y = predict(model), group = participant, col = "Subject"), size = 0.5) +
+  geom_line(data = test_measures %>% distinct(sec_5), aes(y = predict(model, re.form = NA, newdata = test_measures %>% distinct(sec_5)), col="Population"), size = 1.5) +
   scale_colour_manual(values = c("Subject" = "darkgrey", "Population" = "red")) +
   xlab("1-second interval") +
   ylab("Pupil Size (mm)") +
@@ -158,37 +154,43 @@ test_measures %>%
     theme(legend.margin = margin(t = 0, b = 0, unit='cm')) +
     theme(axis.title = element_text(size = 10)) +
     theme(axis.text = element_text(size = 8))
-```
 
+return(g)
+
+}
+```
 
 ### AIC as number of knots is increased
 
-Considering 1 to 9 knots placed at quantiles of time intervals.
+Considering 1 to 14 knots placed at quantiles of time intervals.
 
 ```{r, warning=FALSE, message=FALSE}
 
-AIC_s <- rep(0,9)
-BIC_s <- rep(0,9)
+AIC_s <- rep(0,14)
+BIC_s <- rep(0,14)
 
-for (i in 2:10){
+for (i in 2:15){
   
-  PS_model <- lmer(data = fixation_intervals,
-                       pupil_mean ~ bs(event_interval, df = i, degree = 1) + (bs(event_interval, df = i, degree = 1) | ID))
+  PS_model <- lmer(data = test_measures,
+                       pupil_diameter ~ bs(sec_1, df = i, degree = 1) + (bs(sec_1, df = i, degree = 1) | participant))
 
   AIC_s[i-1] <- AICc(PS_model)
   BIC_s[i-1] <- BIC(PS_model)
 }
+```
 
-ggplot(data = data_frame(knots = 1:9, AIC = AIC_s, BIC = BIC_s)) +
+Plotting AICc and BIC vs. Number of Knots
+
+```{r}
+ggplot(data = data_frame(knots = 1:14, AIC = AIC_s, BIC = BIC_s)) +
   geom_point(aes(x = knots, y = AIC, col = "red")) +
   geom_point(aes(x = knots, y = BIC, col = "blue")) +
   ylab("BIC/AIC") +
   xlab("Number of b-spline internal knots") +
-  scale_color_manual(labels = c("BIC", "AIC"), values = c("blue", "red")) +
+  scale_color_manual(labels = c("BIC", "AICc"), values = c("blue", "red")) +
   theme(legend.title = element_blank())
-
-AIC_s
 ```
+
 
 AIC suggests 2 knots for piecewise linear
 
