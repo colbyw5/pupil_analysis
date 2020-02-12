@@ -166,10 +166,10 @@ Considering 1 to 14 knots placed at quantiles of time intervals.
 
 ```{r, warning=FALSE, message=FALSE}
 
-AIC_s <- rep(0,14)
-BIC_s <- rep(0,14)
+AIC_s <- rep(0,20)
+BIC_s <- rep(0,20)
 
-for (i in 2:15){
+for (i in 2:21){
   
   PS_model <- lmer(data = test_measures,
                        pupil_diameter ~ bs(sec_1, df = i, degree = 1) + (bs(sec_1, df = i, degree = 1) | participant))
@@ -182,7 +182,7 @@ for (i in 2:15){
 Plotting AICc and BIC vs. Number of Knots
 
 ```{r}
-ggplot(data = data_frame(knots = 1:14, AIC = AIC_s, BIC = BIC_s)) +
+ggplot(data = data_frame(knots = 1:20, AIC = AIC_s, BIC = BIC_s)) +
   geom_point(aes(x = knots, y = AIC, col = "red")) +
   geom_point(aes(x = knots, y = BIC, col = "blue")) +
   ylab("BIC/AIC") +
