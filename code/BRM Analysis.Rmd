@@ -179,9 +179,12 @@ for (i in 2:21){
 }
 ```
 
+<<<<<<< HEAD
 Plotting AICc and BIC vs. Number of Knots
 
 ```{r}
+=======
+>>>>>>> fitting-fda
 ggplot(data = data_frame(knots = 1:20, AIC = AIC_s, BIC = BIC_s)) +
   geom_point(aes(x = knots, y = AIC, col = "red")) +
   geom_point(aes(x = knots, y = BIC, col = "blue")) +
